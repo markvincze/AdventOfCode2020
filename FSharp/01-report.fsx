@@ -7,9 +7,8 @@ let numbers = File.ReadAllLines "01-report-input.txt"
 
 let rec pairs items =
     match items with
-    | [] -> []
-    | [ a ] -> []
-    | [ a; b ] -> [ (a, b) ]
+    | [] | [_] -> []
+    | [ a; b ] -> [(a, b)]
     | h :: t -> let ps1 = pairs t
                 let ps2 = t |> List.map (fun x -> (h, x))
                 List.concat [ ps1; ps2 ]
@@ -22,18 +21,14 @@ let a1, b1 =
 let result1 = a1 * b1
 
 let rec triplets items =
-    let itemsA = Array.ofList items
-    let l = Array.length itemsA
     match items with
-    | [] -> []
-    | [ a ] -> []
-    | [ a; b ] -> []
-    | _ -> [ for i in 0..(l - 1) do
-               for j in 0..(l - 1) do
-                   for k in 0..(l - 1) do
-                       if i = j || i = k || j = k
-                       then ()
-                       else yield (itemsA.[i], itemsA.[j], itemsA.[k]) ]
+    | [] | [_] | [_;_] -> []
+    | [ a; b; c ] -> [(a, b, c)]
+    | h :: t -> let ts = triplets t
+                let ps = pairs t
+                [ for (a, b) in ps do 
+                    yield (a, b, h)
+                  yield! ts ]
 
 let a2, b2, c2 =
     numbers
