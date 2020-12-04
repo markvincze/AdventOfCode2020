@@ -1,8 +1,6 @@
 open System
 open System.IO
 
-type Line = int * int * char * string
-
 let parse (line : string) =
     let segments = line.Split ' '
     let limits = segments.[0].Split '-'
@@ -18,7 +16,6 @@ let valid1 (min, max, ch, pwd) =
 let result1 = lines
               |> Seq.filter valid1
               |> Seq.length
-
 
 let valid2 (pos1, pos2, ch, (pwd : string)) = 
     (pwd.[pos1-1] = ch || pwd.[pos2-1] = ch) && not (pwd.[pos1-1] = ch && pwd.[pos2-1] = ch)
