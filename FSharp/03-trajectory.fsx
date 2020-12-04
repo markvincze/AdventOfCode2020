@@ -22,11 +22,18 @@ let grid =
 let square (grid : Square[,]) (x, y) =
     grid.[x % (Array2D.length1 grid), y % (Array2D.length2 grid)]
 
-let rec countTrees grid (x, y) cnt =
+let rec countTrees grid (x, y) (sx, sy) cnt =
     if y >= Array2D.length2 grid
-    then cnt
+    then cnt |> int64
     else if square grid (x, y) = Tree
-         then countTrees grid (x + 3, y + 1) (cnt + 1)
-         else countTrees grid (x + 3, y + 1) cnt
+         then countTrees grid (x + sx, y + sy) (sx, sy) (cnt + 1)
+         else countTrees grid (x + sx, y + sy) (sx, sy) cnt
 
-let result1 = countTrees grid (0, 0) 0
+let result1 = countTrees grid (0, 0) (3, 1) 0
+
+let result2 = 
+    (countTrees grid (0, 0) (1, 1) 0) *
+    (countTrees grid (0, 0) (3, 1) 0) *
+    (countTrees grid (0, 0) (5, 1) 0) *
+    (countTrees grid (0, 0) (7, 1) 0) *
+    (countTrees grid (0, 0) (1, 2) 0)
