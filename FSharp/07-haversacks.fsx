@@ -25,7 +25,7 @@ let entries = File.ReadAllLines "07-haversacks-input.txt"
               |> Array.map parse
               |> List.ofArray
 
-let rec buildCache cache entries =
+let rec buildParentCache cache entries =
     match entries with
     | [] -> cache
     | h :: t -> let cache = Array.fold
@@ -34,7 +34,7 @@ let rec buildCache cache entries =
                                                      | Some ps -> Map.add c (h.Parent :: ps) cache)
                                 cache
                                 h.Children
-                buildCache cache t
+                buildParentCache cache t
 
 let rec collectAncestors cache color =
     match Map.tryFind color cache with
@@ -46,6 +46,16 @@ let rec collectAncestors cache color =
                          (parents |> Set.ofList)
                          (List.collect (fun p -> collectAncestors cache p |> Set.toList) parents |> Set.ofList)
 
-let cache = buildCache Map.empty<string, string list> entries
+let parentCache = buildParentCache Map.empty<string, string list> entries
 
-let result1 = collectAncestors cache "shiny gold" |> Set.count
+let result1 = collectAncestors parentCache "shiny gold" |> Set.count
+
+let cache = entries |> List.map (fun e -> (e.Parent, e.Children)) |> Map.ofList
+
+let rec countContainedBags cache color =
+    let children = Map.find color cache
+    Array.sumBy
+        (fun (count, color) -> count + (count * (countContainedBags cache color)))
+        children
+
+let result2 = countContainedBags cache "shiny gold"
