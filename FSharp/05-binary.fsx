@@ -4,18 +4,12 @@ open System.IO
 let lines = File.ReadAllLines "05-binary-input.txt"
 
 let row (pass : string) =
-    (if pass.[0] = 'B' then 64 else 0) +
-    (if pass.[1] = 'B' then 32 else 0) +
-    (if pass.[2] = 'B' then 16 else 0) +
-    (if pass.[3] = 'B' then 8 else 0) +
-    (if pass.[4] = 'B' then 4 else 0) +
-    (if pass.[5] = 'B' then 2 else 0) +
-    (if pass.[6] = 'B' then 1 else 0)
+    [ 0..6 ]
+    |> List.sumBy (fun i -> if pass.[i] = 'B' then (Math.Pow(2.0, (6 - i) |> float)) |> int else 0)
 
 let column (pass : string) =
-    (if pass.[7] = 'R' then 4 else 0) +
-    (if pass.[8] = 'R' then 2 else 0) +
-    (if pass.[9] = 'R' then 1 else 0)
+    [ 7..9 ]
+    |> List.sumBy (fun i -> if pass.[i] = 'R' then (Math.Pow(2.0, (9 - i) |> float)) |> int else 0)
 
 let seatId pass = (row pass) * 8 + (column pass)
 
