@@ -7,11 +7,13 @@ let play cache round previousNumber =
     | None -> cache |> Map.add previousNumber (round - 1), 0
     | Some r -> cache |> Map.add previousNumber (round - 1), round - 1 - r
 
-let rec playUntil2020 cache round previousNumber =
+let rec playUntil until cache round previousNumber =
     let cache, newNumber = play cache round previousNumber
 
-    if round = 2020
+    if round = until
     then newNumber
-    else playUntil2020 cache (round + 1) newNumber
+    else playUntil until cache (round + 1) newNumber
 
-let result1 = playUntil2020 cache ((input |> List.length) + 1) (input |> List.last) 
+let result1 = playUntil 2020 cache ((input |> List.length) + 1) (input |> List.last) 
+
+let result2 = playUntil 30000000 cache ((input |> List.length) + 1) (input |> List.last) 
