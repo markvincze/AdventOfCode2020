@@ -1,111 +1,79 @@
 open System
 open System.IO
 
-type Operation =
+type Operator =
 | Add
 | Multiply
 
-type Expression = {
-    Head : (Operation * Expression) option
-    Tail : Argument
-} and Argument =
+type Expression =
 | Constant of int64
+| Operation of Operation
 | Group of Expression
+and Operation = {
+    Left : Expression
+    Op : Operator
+    Right : Expression
+}
 
-let rec calculateExpression expr =
-    let tailValue = calculateArgument expr.Tail
-    match expr.Head with
-    | None -> tailValue
-    | Some (op, headExpr) -> let headValue = calculateExpression headExpr
-                             match op with
-                             | Add -> headValue + tailValue
-                             | Multiply -> headValue * tailValue
-and calculateArgument arg =
-    match arg with
-    | Constant x -> x
-    | Group expr -> calculateExpression expr
+let addTop op left right =
+    Operation {
+        Left = left
+        Op = op
+        Right = right
+    }
 
-let input = File.ReadAllLines "18-operation-order-input.txt"
+let rec addBottom op expr newExpr =
+    match expr with
+    | Constant _ | Group _ ->
+        Operation {
+            Left = expr
+            Op = op
+            Right = newExpr
+        }
+    | Operation { Left = left; Op = leftOp; Right = right } ->
+        Operation {
+            Left = left
+            Op = leftOp
+            Right = addBottom op right newExpr
+        }
 
-// 7 * 2 + 4 + 3 * 4 * 5
-let rec parse (line : string) index currentExpr lastOp = 
+let rec parse addAdd addMultiply (line : string) index currentExpr lastOp =
     if index = line.Length
     then (currentExpr |> Option.get, index)
     else let mutable argInt = 0L
          match line.[index] with
-         | ' ' -> parse line (index + 1) currentExpr lastOp
+         | ' ' -> parse addAdd addMultiply line (index + 1) currentExpr lastOp
          | d when Int64.TryParse(string d, &argInt) ->
              match currentExpr with
-             | None -> parse line (index + 1) (Some { Head = None; Tail = Constant argInt }) lastOp
-             | Some currentExpr -> let newExpr = { 
-                                       Head = Some (lastOp, currentExpr);
-                                       Tail = Constant argInt
-                                   }
-                                   parse line (index + 1) (Some newExpr) lastOp
-         | '+' -> parse line (index + 1) currentExpr Add
-         | '*' -> parse line (index + 1) currentExpr Multiply
+             | None -> parse addAdd addMultiply line (index + 1) (Some (Constant argInt)) lastOp
+             | Some currentExpr ->
+                 let addFn = match lastOp with Add -> addAdd | Multiply -> addMultiply
+                 parse addAdd addMultiply line (index + 1) (Some (addFn currentExpr (Constant argInt))) lastOp
+         | '+' -> parse addAdd addMultiply line (index + 1) currentExpr Add
+         | '*' -> parse addAdd addMultiply line (index + 1) currentExpr Multiply
          | '(' ->
-             let (group, closeIndex) = parse line (index + 1) None lastOp
+             let (group, closeIndex) = parse addAdd addMultiply line (index + 1) None lastOp
              match currentExpr with
-             | None -> parse line (closeIndex + 1) (Some { Head = None; Tail = Group group }) lastOp
-             | Some currentExpr -> let newExpr = { 
-                                       Head = Some (lastOp, currentExpr);
-                                       Tail = Group group
-                                   }
-                                   parse line (closeIndex + 1) (Some newExpr) lastOp
-         | ')' -> (currentExpr |> Option.get, index)
+             | None -> parse addAdd addMultiply line (closeIndex + 1) (Some group) lastOp
+             | Some currentExpr ->
+                 let addFn = match lastOp with Add -> addAdd | Multiply -> addMultiply
+                 parse addAdd addMultiply line (closeIndex + 1) (Some (addFn currentExpr group)) lastOp
+         | ')' -> (currentExpr |> Option.get |> Group, index)
          | _ -> failwith "Invalid input"
 
-// 7 * 2 + 4 + 3 * 4 * 5
-let expr1a = {
-    Head = Some (Multiply, {
-        Head = Some (Multiply, {
-            Head = Some (Add, {
-                Head = Some (Add, {
-                    Head = Some (Multiply, {
-                        Head = None
-                        Tail = Constant 7L
-                    })
-                    Tail = Constant 2L
-                })
-                Tail = Constant 4L
-            })
-            Tail = Constant 3L
-        })
-        Tail = Constant 4L
-    })
-    Tail = Constant 5L
-}
+let rec calcExpr expr = 
+    match expr with
+    | Constant c -> c
+    | Group e -> calcExpr e
+    | Operation { Left = left; Op = op; Right = right } ->
+        match op with
+        | Add -> calcExpr left + calcExpr right
+        | Multiply -> calcExpr left * calcExpr right
 
-let testValue1a = calculateExpression expr1a
-
-let expr1b, _ = parse "7 * 2 + 4 + 3 * 4 * 5" 0 None Add
-
-let testValue1b = calculateExpression expr1b
-
-// 2 * 3 + (4 * 5)
-let expr2a = {
-    Head = Some (Add, {
-        Head = Some (Multiply, {
-            Head = None
-            Tail = Constant 2L
-        })
-        Tail = Constant 3L
-    })
-    Tail = Group {
-        Head = Some (Multiply, {
-            Head = None
-            Tail = Constant 4L
-        })
-        Tail = Constant 5L
-    }
-}
-
-let expr2b, _ = parse "2 * 3 + (4 * 5)" 0 None Add
-
-let testValue2a = calculateExpression expr2a
-
-let testValue2b = calculateExpression expr2b
+let input = File.ReadAllLines "18-operation-order-input.txt"
 
 let result1 = input
-              |> Array.sumBy (fun line -> parse line 0 None Add |> fst |> calculateExpression)
+              |> Array.sumBy (fun line -> parse (addTop Add) (addTop Multiply) line 0 None Add |> fst |> calcExpr)
+
+let result2 = input
+              |> Array.sumBy (fun line -> parse (addBottom Add) (addTop Multiply) line 0 None Add |> fst |> calcExpr)
