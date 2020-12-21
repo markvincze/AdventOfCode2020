@@ -1,6 +1,5 @@
 open System
 open System.IO
-open System.Text.RegularExpressions
 
 type Rule =
 | Char of char
@@ -13,29 +12,27 @@ let input = File.ReadAllLines "19-monster-messages-input.txt"
 let doesMatch ruleCache rule str =
     let rec doesMatch ruleCache rule (str : string) index =
         if index >= str.Length
-        then (false, index)
+        then []
         else match rule with
              | Char char -> match str.[index] with
-                            | c when c = char -> true, (index + 1)
-                            | _ -> false, index
+                            | c when c = char -> [index + 1]
+                            | _ -> []
              | RuleReference id -> let lookedUpRule = Map.find id ruleCache
                                    doesMatch ruleCache lookedUpRule str index
-             | Choice (r1, r2) -> let m1, i1 = doesMatch ruleCache r1 str index
-                                  let m2, i2 = doesMatch ruleCache r2 str index
-                                  if m1 then m1, i1
-                                  else if m2 then m2, i2
-                                  else false, index
+             | Choice (r1, r2) -> let ms1 = doesMatch ruleCache r1 str index
+                                  let ms2 = doesMatch ruleCache r2 str index
+                                  List.append ms1 ms2
              | Sequence rules -> List.fold
-                                     (fun (m, i) r -> if m then doesMatch ruleCache r str i
-                                                      else m, i)
-                                     (true, index)
+                                     (fun indices rule ->
+                                        indices
+                                        |> List.collect (fun i -> doesMatch ruleCache rule str i))
+                                     [index]
                                      rules
 
-    let (m, i) = doesMatch ruleCache rule str 0
-    m && i = (str.Length)
+    let indices = doesMatch ruleCache rule str 0
+    indices |> List.exists (fun i -> i = (str.Length))
 
 let ids (line : string) = let ruleStr = (line.Split ": ").[1]
-                        //   printfn "Rule: %s" ruleStr
                           if ruleStr.StartsWith "\"" 
                           then [||]
                           else ruleStr.Split([| ' '; '|' |], StringSplitOptions.TrimEntries ||| StringSplitOptions.RemoveEmptyEntries)
@@ -43,22 +40,11 @@ let ids (line : string) = let ruleStr = (line.Split ": ").[1]
 
 let parseSeq ruleCache (str : string) =
     str.Split ' '
-    // |> Array.map (fun rid -> Map.find (Int32.Parse rid) ruleCache)
-    // |> Array.map (fun rid -> RuleReference (Int32.Parse rid))
     |> Array.map (Int32.Parse >> RuleReference)
     |> List.ofArray
     |> Sequence
 
 let rec parse (rulesInput : string list) (ruleCache : Map<int, Rule>) =
-    // let nextLine =
-    //     rulesInput
-    //     |> Array.tryFind (fun line -> let ruleId = (line.Split ':').[0] |> Int32.Parse
-    //                                   not (Map.containsKey ruleId ruleCache) &&
-    //                                   ids line |> Array.forall (fun i -> Map.containsKey i ruleCache))
-    // printfn "Start parsing line '%s'" (Option.get nextLine)
-    // match nextLine with
-    // | None -> ruleCache.[0], ruleCache
-    // | Some line ->
     match rulesInput with
     | [] -> ruleCache.[0], ruleCache
     | line :: t ->
@@ -71,20 +57,33 @@ let rec parse (rulesInput : string list) (ruleCache : Map<int, Rule>) =
                    then let [|seq1; seq2|] = ruleStr.Split " | "
                         Choice (parseSeq ruleCache seq1, parseSeq ruleCache seq2)
                    else parseSeq ruleCache ruleStr
-        // printfn "Adding rule with id %d to the cache" ruleId
         parse t (Map.add ruleId rule ruleCache)
-
-let rulesInput = input
-                 |> Array.takeWhile (fun l -> l <> "")
-                 |> List.ofArray
-
-let rootRule, ruleCache = parse rulesInput Map.empty<int, Rule>
 
 let testInput = input
                 |> Array.skipWhile (fun l -> l <> "")
                 |> Array.skip 1
 
+let rulesInput1 = input
+                 |> Array.takeWhile (fun l -> l <> "")
+                 |> List.ofArray
+
+let rootRule1, ruleCache1 = parse rulesInput1 Map.empty<int, Rule>
+
+let rulesInput2 = input
+                 |> Array.takeWhile (fun l -> l <> "")
+                 |> Array.map (fun line ->
+                    match line with
+                    | "8: 42" -> "8: 42 | 42 8"
+                    | "11: 42 31" -> "11: 42 31 | 42 11 31"
+                    | _ -> line)
+                 |> List.ofArray
+
+let rootRule2, ruleCache2 = parse rulesInput2 Map.empty<int, Rule>
+
 let result1 = testInput
-              |> Seq.filter (doesMatch ruleCache rootRule)
+              |> Seq.filter (doesMatch ruleCache1 rootRule1)
               |> Seq.length
-// Result1: 156
+
+let result2 = testInput
+              |> Seq.filter (doesMatch ruleCache2 rootRule2)
+              |> Seq.length
