@@ -117,16 +117,20 @@ let rec findSolution image (x, y) remainingTiles =
     // if y >= 1 then printfn "Trying to find solutions, current pos: %d, %d" x y
     if y >= Array2D.length2 image
     then //printfn "Reached solution at %d, %d" x y
-         [ image ]
-    else remainingTiles
-         |> List.collect (fun tile -> allTransformations |> List.map (fun transformation -> tile, transformation))
-         |> List.filter (fun (tile, transformation) -> fits image (tile, transformation) (x, y))
-         |> List.collect (fun (tile, transformation) -> let newImage = arraySet (x, y) (Some (tile, transformation)) image
-                                                        findSolution newImage (next (x, y)) (List.except [tile] remainingTiles))
+        //  [ image ]
+         Some (image |> Array2D.copy)
+    else let result = remainingTiles
+                      |> Seq.collect (fun tile -> allTransformations |> List.map (fun transformation -> tile, transformation))
+                      |> Seq.filter (fun (tile, transformation) -> fits image (tile, transformation) (x, y))
+                      |> Seq.tryPick (fun (tile, transformation) -> //let newImage = arraySet (x, y) (Some (tile, transformation)) image
+                                                                    image.[x, y] <- (Some (tile, transformation))
+                                                                    findSolution image (next (x, y)) (List.except [tile] remainingTiles))
+         image.[x, y] <- None
+         result
 
 let (emptyImage : ((Tile * Transformation) option)[,]) = Array2D.create sideTileCount sideTileCount None
 
-let result = findSolution emptyImage (0, 0) tiles
+// let result = findSolution emptyImage (0, 0) tiles |> Option.get
 
 let validate image =
     seq {
@@ -140,23 +144,14 @@ let printImage (image : (Tile * Transformation) option [,]) =
     for tileY in 0..sideTileCount - 1 do
         for y in 0..tileSize - 1 do
             for tileX in 0..sideTileCount - 1 do
-                // printfn "Getting tile %d, %d" tileX tileY
                 let tile, transformation = image.[tileX, tileY] |> Option.get
                 let tile = transform transformation tile
 
                 if y = 0 then printf "%s" tile.TopBorder
                 else if y = tileSize - 1 then printf "%s" (reverse tile.BottomBorder)
-                else if y = 2 then printf "%c #%d   %c" (tile.LeftBorder.[y]) tile.Id (tile.RightBorder.[tileSize - 1 - y])
+                else if y = 2 then printf "%c #%d  %c" (tile.LeftBorder.[y]) tile.Id (tile.RightBorder.[tileSize - 1 - y])
                 else printf "%c        %c" (tile.LeftBorder.[y]) (tile.RightBorder.[tileSize - 1 - y])
                 printf " "
             printfn ""
         printfn ""
-    // failwith "boop" |> ignore
 
-printImage (List.head result);;
-
-
-
-
-// let tile1951 = tiles |> List.find (fun t -> t.Id = 1951)
-// let tile2311 = tiles |> List.find (fun t -> t.Id = 2311)
