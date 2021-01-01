@@ -3,7 +3,7 @@ open System.IO
 open System.Text.RegularExpressions
 open System.Text
 
-let input = File.ReadAllLines "20-jurassic-jigsaw-input copy.txt"
+let input = File.ReadAllLines "20-jurassic-jigsaw-input.txt"
             |> List.ofArray
 
 type Border = Top | Right | Bottom | Left
@@ -22,6 +22,7 @@ type Tile = {
     BottomBorder : string
     LeftBorder : string
     BorderCache : Map<Border * Transformation, int>
+    FittingTiles : Map<Border * Transformation, Set<(Transformation * int)>>
 }
 
 let toString chars =
@@ -81,6 +82,7 @@ let parseTile idLine lines =
         BottomBorder = bottom
         LeftBorder = left
         BorderCache = Map.empty
+        FittingTiles = Map.empty
     }
 
     { tile with
@@ -106,7 +108,30 @@ let rec parse input tiles =
                            |> parseTile h
                 parse (List.skip 10 t) (tile :: tiles)
 
-let tiles = parse input List.empty
+let opposite border = match border with
+                      | Top -> Bottom
+                      | Right -> Left
+                      | Bottom -> Top
+                      | Left -> Right
+
+let preloadFittingTiles (tiles : Tile list) =
+    tiles
+    |> List.map (fun tileOrig ->
+        let fittingTiles =
+            [ Top; Right; Bottom; Left]
+            |> List.collect (fun b -> allTransformations |> List.map (fun t -> (b, t)))
+            |> List.map (fun (borderOrig, transformOrig) ->
+                let fittingTiles =
+                    allTransformations
+                    |> List.collect (fun transformOther -> tiles |> List.map (fun tileOther -> (transformOther, tileOther)))
+                    |> List.filter (fun (transformOther, tileOther) -> tileOrig.Id <> tileOther.Id && tileOrig.BorderCache.[(borderOrig, transformOrig)] = tileOther.BorderCache.[((opposite borderOrig), transformOther)])
+                (borderOrig, transformOrig), (fittingTiles |> List.map (fun (trans, tile) -> (trans, tile.Id)) |> Set.ofList))
+            |> Map.ofList
+
+        { tileOrig with FittingTiles = fittingTiles})
+
+let tiles = parse input List.empty |> preloadFittingTiles
+
 let sideTileCount = tiles |> List.length |> float |> Math.Sqrt |> int
 let tileSize = (tiles |> List.head).BottomBorder.Length
 
@@ -114,40 +139,41 @@ let next (x, y) = if x < sideTileCount - 1
                   then (x + 1, y)
                   else (0, y + 1)
 
-// let arraySet (x, y) item array =
-//     let copy = Array2D.copy array
-//     copy.[x, y] <- item
-//     copy
+// let tileAt (x, y) image =
+//     if x >= 0 && x < Array2D.length1 image && y >= 0 && y < Array2D.length2 image
+//     then image.[x, y]
+//     else None
 
-let tileAt (x, y) image =
-    if x >= 0 && x < Array2D.length1 image && y >= 0 && y < Array2D.length2 image
-    then image.[x, y]
-    else None
+// let fits image (tile, transformation) (x, y) =
+//     // (match tileAt (x, y - 1) image with None -> true | Some (above, aboveTransformation) -> (border transformation tile Top |> reverse = border aboveTransformation above Bottom)) &&
+//     // (match tileAt (x + 1, y) image with None -> true | Some (right, rightTransformation) -> (border transformation tile Right |> reverse = border rightTransformation right Left)) &&
+//     // (match tileAt (x, y + 1) image with None -> true | Some (below, belowTransformation) -> (border transformation tile Bottom |> reverse = border belowTransformation below Top)) &&
+//     // (match tileAt (x - 1, y) image with None -> true | Some (left, leftTransformation) -> (border transformation tile Left |> reverse = border leftTransformation left Right))
+//     (match tileAt (x, y - 1) image with None -> true | Some (above, aboveTransformation) -> tile.BorderCache.[(Top, transformation)] = above.BorderCache.[(Bottom, aboveTransformation)]) &&
+//     (match tileAt (x + 1, y) image with None -> true | Some (right, rightTransformation) -> tile.BorderCache.[(Right, transformation)] = right.BorderCache.[(Left, rightTransformation)]) &&
+//     (match tileAt (x, y + 1) image with None -> true | Some (below, belowTransformation) -> tile.BorderCache.[(Bottom, transformation)] = below.BorderCache.[(Top, belowTransformation)]) &&
+//     (match tileAt (x - 1, y) image with None -> true | Some (left, leftTransformation) -> tile.BorderCache.[(Left, transformation)] = left.BorderCache.[(Right, leftTransformation)])
 
-let fits image (tile, transformation) (x, y) =
-    // (match tileAt (x, y - 1) image with None -> true | Some (above, aboveTransformation) -> (border transformation tile Top |> reverse = border aboveTransformation above Bottom)) &&
-    // (match tileAt (x + 1, y) image with None -> true | Some (right, rightTransformation) -> (border transformation tile Right |> reverse = border rightTransformation right Left)) &&
-    // (match tileAt (x, y + 1) image with None -> true | Some (below, belowTransformation) -> (border transformation tile Bottom |> reverse = border belowTransformation below Top)) &&
-    // (match tileAt (x - 1, y) image with None -> true | Some (left, leftTransformation) -> (border transformation tile Left |> reverse = border leftTransformation left Right))
-    (match tileAt (x, y - 1) image with None -> true | Some (above, aboveTransformation) -> tile.BorderCache.[(Top, transformation)] = above.BorderCache.[(Bottom, aboveTransformation)]) &&
-    (match tileAt (x + 1, y) image with None -> true | Some (right, rightTransformation) -> tile.BorderCache.[(Right, transformation)] = right.BorderCache.[(Left, rightTransformation)]) &&
-    (match tileAt (x, y + 1) image with None -> true | Some (below, belowTransformation) -> tile.BorderCache.[(Bottom, transformation)] = below.BorderCache.[(Top, belowTransformation)]) &&
-    (match tileAt (x - 1, y) image with None -> true | Some (left, leftTransformation) -> tile.BorderCache.[(Left, transformation)] = left.BorderCache.[(Right, leftTransformation)])
+let tileCache = tiles |> List.map (fun tile -> (tile.Id, tile)) |> Map.ofList
 
 let rec findSolution image (x, y) remainingTiles =
-    // if y >= 4 && x > 0 then printfn "Trying to find solutions, current pos: %d, %d" x y
-    if y >= 8 then printfn "Trying to find solutions, current pos: %d, %d" x y
     if y >= Array2D.length2 image
-    // if y >= 4
-    then //printfn "Reached solution at %d, %d" x y
-        //  [ image ]
+    then printfn "Reached solution at %d, %d" x y
          Some (image |> Array2D.copy)
-    else let result = remainingTiles
-                      |> Seq.collect (fun tile -> allTransformations |> List.map (fun transformation -> tile, transformation))
-                      |> Seq.filter (fun (tile, transformation) -> fits image (tile, transformation) (x, y))
-                      |> Seq.tryPick (fun (tile, transformation) -> //let newImage = arraySet (x, y) (Some (tile, transformation)) image
-                                                                    image.[x, y] <- (Some (tile, transformation))
-                                                                    // findSolution image (next (x, y)) (List.except [tile] remainingTiles))
+    else let result = allTransformations
+                      |> Seq.collect (fun transform ->
+                          if (x, y) = (0, 0) then remainingTiles |> Seq.map (fun rt -> (rt, transform))
+                          else let fittingTiles = if y = 0 then let leftTile, leftTransform = (Option.get image.[x - 1, y])
+                                                                leftTile.FittingTiles.[(Right, leftTransform)]
+                                                  else if x = 0 then let aboveTile, aboveTransform = (Option.get image.[x, y - 1])
+                                                                     aboveTile.FittingTiles.[(Bottom, aboveTransform)]
+                                                  else let leftTile, leftTransform = (Option.get image.[x - 1, y])
+                                                       let aboveTile, aboveTransform = (Option.get image.[x, y - 1])
+                                                       Set.intersect leftTile.FittingTiles.[(Right, leftTransform)] aboveTile.FittingTiles.[(Bottom, aboveTransform)]
+                               fittingTiles
+                               |> Seq.filter (fun (tileTransform, _) -> tileTransform = transform)
+                               |> Seq.map (fun (tileTransform, tileId) -> (Map.find tileId tileCache), tileTransform))
+                      |> Seq.tryPick (fun (tile, transformation) -> image.[x, y] <- (Some (tile, transformation))
                                                                     findSolution image (next (x, y)) (Set.remove tile remainingTiles))
          image.[x, y] <- None
          result
@@ -155,14 +181,6 @@ let rec findSolution image (x, y) remainingTiles =
 let (emptyImage : ((Tile * Transformation) option)[,]) = Array2D.create sideTileCount sideTileCount None
 
 let result = findSolution emptyImage (0, 0) (tiles |> Set.ofList)
-
-let validate image =
-    seq {
-        for x in 0..sideTileCount - 1 do
-            for y in 0..sideTileCount - 1 do
-                (x, y)
-    }
-    |> Seq.forall (fun (x, y) -> fits image (Option.get image.[x, y]) (x, y ))
 
 let printImage (image : (Tile * Transformation) option [,]) =
     for tileY in 0..sideTileCount - 1 do
@@ -178,4 +196,3 @@ let printImage (image : (Tile * Transformation) option [,]) =
                 printf " "
             printfn ""
         printfn ""
-
