@@ -218,19 +218,10 @@ let transformRaw transformation tile =
 
 let printImage2 (image : (Tile * Transformation) option [,]) =
     for tileY in 0..sideTileCount - 1 do
-        // for y in 0..tileSize - 1 do
         for y in 1..tileSize - 2 do
             for tileX in 0..sideTileCount - 1 do
                 let tile, transformation = image.[tileX, tileY] |> Option.get
                 let rawTile = rawTiles.[tile.Id] |> transformRaw transformation
 
-                // printfn "tileY: %d, tileX: %d, y: %d" tileY tileX y
-
                 printf "%s" ((rawTile |> List.item y).Substring(1, 8))
-                // if y = 0 then printf "%s" tile.TopBorder
-                // else if y = tileSize - 1 then printf "%s" (reverse tile.BottomBorder)
-                // else if y = 2 then printf "%c #%d  %c" (tile.LeftBorder.[y]) tile.Id (tile.RightBorder.[tileSize - 1 - y])
-                // else printf "%c        %c" (tile.LeftBorder.[y]) (tile.RightBorder.[tileSize - 1 - y])
-                // printf " "
             printfn ""
-        // printfn ""
