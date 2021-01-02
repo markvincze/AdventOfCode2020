@@ -42,6 +42,39 @@ let calculateScore deck =
     |> List.indexed
     |> List.sumBy (fun (i, card) -> (i + 1) * card)
 
-let winnerDeck = play deck1 deck2
-let result1 = winnerDeck |> calculateScore
+let winnerDeck1 = play deck1 deck2
+let result1 = winnerDeck1 |> calculateScore
+
+// Part 2
+type Player = Player1 | Player2 
+
+let fingerprint deck1 deck2 =
+    String.Join(",", deck1 |> List.map (fun c -> c |> string) |> Array.ofList) +
+    "#" +
+    String.Join(",", deck2 |> List.map (fun c -> c |> string) |> Array.ofList)
+
+let rec recPlayRound deck1 deck2 =
+    let h1 = List.head deck1
+    let h2 = List.head deck2
+    if (List.length deck1 > h1 && List.length deck2 > h2)
+    then let winner, _ = recPlay Set.empty (deck1 |> List.skip 1 |> List.take h1) (deck2 |> List.skip 1 |> List.take h2)
+         match winner with
+         | Player1 -> List.append (deck1 |> List.skip 1) [h1; h2], deck2 |> List.skip 1
+         | Player2 -> deck1 |> List.skip 1, List.append (deck2 |> List.skip 1) [h2; h1]
+    else if h1 > h2
+         then List.append (deck1 |> List.skip 1) [h1; h2], deck2 |> List.skip 1
+         else deck1 |> List.skip 1, List.append (deck2 |> List.skip 1) [h2; h1]
+and recPlay fingerprints deck1 deck2 =
+    let print = fingerprint deck1 deck2
+    if Set.contains print fingerprints
+    then Player1, deck1
+    else if List.isEmpty deck1
+         then Player2, deck2
+         else if List.isEmpty deck2
+         then Player1, deck1
+         else let deck1New, deck2New = recPlayRound deck1 deck2
+              recPlay (Set.add (fingerprint deck1 deck2) fingerprints)  deck1New deck2New
+
+let _, winnerDeck2 = recPlay Set.empty deck1 deck2
+let result2 = winnerDeck2 |> calculateScore
 
