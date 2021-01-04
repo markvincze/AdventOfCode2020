@@ -42,9 +42,13 @@ let endPosition steps =
 let flips = stepList
             |> List.map endPosition
             |> List.fold
-                (fun flips pos -> flips |> Map.change pos (fun cnt -> Some ((Option.defaultValue 0 cnt) + 1)))
+                (fun flips pos -> flips |> Map.change pos (Option.defaultValue false >> not >> Some))
                 Map.empty
 
 let result1 = flips 
               |> Seq.filter (fun kvp -> kvp.Value % 2 = 1)
               |> Seq.length
+
+let neighbors (q, r) = [(q + 1, r); (q, r + 1); (q - 1, r + 1); (q - 1, r); (q, r - 1); (q + 1, r - 1)]
+
+let expand flips
