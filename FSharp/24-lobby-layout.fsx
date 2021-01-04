@@ -39,16 +39,54 @@ let step d (q, r) = match d with
 let endPosition steps =
     steps |> List.fold (fun pos dir -> step dir pos) (0, 0)
 
-let flips = stepList
+let tiles = stepList
             |> List.map endPosition
             |> List.fold
-                (fun flips pos -> flips |> Map.change pos (Option.defaultValue false >> not >> Some))
+                (fun flips pos -> match Map.tryFind pos flips with
+                                  | None -> Map.add pos true flips
+                                  | Some isBlack -> Map.add pos (not isBlack) flips)
                 Map.empty
 
-let result1 = flips 
-              |> Seq.filter (fun kvp -> kvp.Value % 2 = 1)
-              |> Seq.length
+let blackTileCount (tiles : Map<(int * int), bool>) =
+    tiles 
+    |> Seq.filter (fun kvp -> kvp.Value)
+    |> Seq.length
+
+let result1 = blackTileCount tiles 
 
 let neighbors (q, r) = [(q + 1, r); (q, r + 1); (q - 1, r + 1); (q - 1, r); (q, r - 1); (q + 1, r - 1)]
 
-let expand flips
+let initIfMissing tiles pos = match Map.tryFind pos tiles with
+                              | None -> Map.add pos false tiles
+                              | Some _ -> tiles
+
+let expand tiles =
+    tiles
+    |> Map.filter (fun _ isBlack -> isBlack)
+    |> Map.fold
+        (fun expanded pos color ->
+            neighbors pos
+            |> List.fold initIfMissing expanded)
+        tiles
+
+let blackNeighborCount tiles pos =
+    neighbors pos
+    |> List.filter (fun p -> Map.tryFind p tiles |> Option.defaultValue false)
+    |> List.length
+
+let evolve tiles =
+    let tiles = expand tiles
+    tiles
+    |> Map.map (fun pos isBlack -> match isBlack, blackNeighborCount tiles pos with
+                                   | true, 0 -> false
+                                   | true, bnc when bnc > 2 -> false
+                                   | false, 2 -> true
+                                   | isBlack, _ -> isBlack)
+
+let rec evolveN tiles n =
+    match n with
+    | 0 -> tiles
+    | n -> evolveN (evolve tiles) (n - 1)
+
+let final = evolveN tiles 100
+let result2 = blackTileCount final
